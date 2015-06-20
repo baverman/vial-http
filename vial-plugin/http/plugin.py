@@ -92,19 +92,23 @@ def http():
     if query:
         path += '?' + urllib.urlencode(query)
 
+    if u.scheme == 'https':
+        cn = httplib.HTTPSConnection(u.hostname, u.port or 443)
+    else:
+        cn = httplib.HTTPConnection(u.hostname, u.port or 80)
+
     start = time.time()
-    cn = httplib.HTTPConnection(u.hostname, u.port or 80)
     cn.connect()
-    ctime = time.time() - start
+    ctime = int((time.time() - start) * 1000)
 
     cn.request(method, path, body, headers)
     response = cn.getresponse()
-    duration = int((time.time() - start) * 1000)
+    rtime = int((time.time() - start) * 1000)
 
     cwin = vim.current.window
     win, buf = make_scratch('__vial_http__')
     win.options['statusline'] = 'vial-http: {} {} {}ms {}ms'.format(
-        response.status, response.reason, duration, round(ctime * 1000, 2))
+        response.status, response.reason, rtime, ctime)
 
     content = response.read()
     try:
@@ -115,5 +119,5 @@ def http():
         vim.command('setfiletype html')
 
     buf[:] = content.splitlines()
-    vim.command('normal! gg')
+    win.cursor = 1, 0
     focus_window(cwin)
