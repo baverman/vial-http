@@ -9,12 +9,44 @@ from vial import vfunc, vim
 from vial.utils import focus_window
 from vial.widgets import make_scratch
 
-header_regex = re.compile(r'^[-\w\d]+$')
+header_regex = re.compile(r'^\+?[-\w\d]+$')
 value_regex = re.compile(r'^([-_\w\d]+)(:=|=|:)(.+)$')
 
 
+class Headers(object):
+    def __init__(self):
+        self.headers = []
+
+    def set(self, header, value):
+        self.headers = [r for r in self.headers if r[0].lower() != header.lower()]
+        self.headers.append((header, value))
+
+    def add(self, header, value):
+        self.headers.append((header, value))
+
+    def __contains__(self, header):
+        return any(h.lower() == header.lower() for h, _ in self.headers)
+
+    def pop(self, header, default=None):
+        result = default
+        headers = []
+        for h, v in self.headers:
+            if h.lower() == header.lower():
+                result = v
+            else:
+                headers.append((h, v))
+        self.headers = headers
+        return result
+
+    def iteritems(self):
+        return self.headers
+
+    def __iter__(self):
+        return (h for h, _ in self.headers)
+
+
 def get_headers(lines, line):
-    headers = {}
+    headers = Headers()
     for l in lines[:line]:
         try:
             header, value = l.split(':', 1)
@@ -22,18 +54,20 @@ def get_headers(lines, line):
             continue
 
         if header_regex.match(header):
-            headers[header.lower()] = value.strip()
+            if header[0] == '+':
+                headers.add(header[1:], value.strip())
+            else:
+                headers.set(header, value.strip())
 
     return headers
 
 
-def get_request(lines, line):
+def get_request(lines, line, headers):
     parts = lines[line].split()
     method = parts[0]
     url = parts[1]
     query = []
     form = []
-    headers = {}
     body = None
     for p in parts[2:]:
         m = value_regex.match(p)
@@ -44,13 +78,13 @@ def get_request(lines, line):
             if op == '=':
                 query.append((param, value))
             elif op == ':':
-                headers[param.lower()] = value
+                headers.set(param, value)
             elif op == ':=':
                 form.append((param, value))
 
     if form:
         body = urllib.urlencode(form)
-        headers['content-type'] = 'application/x-www-form-urlencoded'
+        headers.set('Content-Type', 'application/x-www-form-urlencoded')
 
     if not form:
         bodylines = []
@@ -64,11 +98,11 @@ def get_request(lines, line):
             try:
                 json.loads(body)
                 if 'content-type' not in headers:
-                    headers['content-type'] = 'application/json'
+                    headers.set('Content-Type', 'application/json')
             except ValueError:
                 pass
 
-    return method, url, headers, query, body
+    return method, url, query, body
 
 
 def http():
@@ -77,8 +111,7 @@ def http():
     line -= 1
 
     headers = get_headers(lines, line)
-    method, url, qheaders, query, body = get_request(lines, line)
-    headers.update(qheaders)
+    method, url, query, body = get_request(lines, line, headers)
 
     host = headers.pop('host', '')
     u = urlparse.urlsplit(url)
