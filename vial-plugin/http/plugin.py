@@ -80,9 +80,10 @@ def http():
     method, url, qheaders, query, body = get_request(lines, line)
     headers.update(qheaders)
 
+    host = headers.pop('host', '')
     u = urlparse.urlsplit(url)
     if not u.hostname:
-        u = urlparse.urlsplit(headers.pop('host') + url)
+        u = urlparse.urlsplit(host + url)
 
     if u.query:
         query = urlparse.parse_qsl(u.query, True) + query
