@@ -52,6 +52,22 @@ def get_request(lines, line):
         body = urllib.urlencode(form)
         headers['content-type'] = 'application/x-www-form-urlencoded'
 
+    if not form:
+        bodylines = []
+        for l in lines[line+1:]:
+            if not l:
+                break
+            bodylines.append(l)
+
+        if bodylines:
+            body = '\n'.join(bodylines)
+            try:
+                json.loads(body)
+                if 'content-type' not in headers:
+                    headers['content-type'] = 'application/json'
+            except ValueError:
+                pass
+
     return method, url, headers, query, body
 
 
@@ -77,18 +93,18 @@ def http():
 
     start = time.time()
     cn = httplib.HTTPConnection(u.hostname, u.port or 80)
+    cn.connect()
     ctime = time.time() - start
+
     cn.request(method, path, body, headers)
     response = cn.getresponse()
-    show_response(response, start, ctime)
-
-
-def show_response(response, start, ctime):
     duration = int((time.time() - start) * 1000)
+
     cwin = vim.current.window
     win, buf = make_scratch('__vial_http__')
     win.options['statusline'] = 'vial-http: {} {} {}ms {}ms'.format(
         response.status, response.reason, duration, round(ctime * 1000, 2))
+
     content = response.read()
     try:
         jdata = json.loads(content)
@@ -96,6 +112,7 @@ def show_response(response, start, ctime):
         vim.command('setfiletype json')
     except ValueError:
         vim.command('setfiletype html')
+
     buf[:] = content.splitlines()
     vim.command('normal! gg')
     focus_window(cwin)
