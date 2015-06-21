@@ -1,0 +1,45 @@
+# This an example http session
+# Place cursor on a request line and do :HttpVial
+
+GET https://api.github.com    # Simple get. Comments can be on a request line too.
+
+# You can define default host and headers
+Host: https://api.github.com
+Accept-Language: en
+Cookie: foo=bar
+
+GET /     # Simple, huh?
+
+# Headers are collected from top of the file to the current request
+# Last header wins
+Accept-Language: fr
+
+GET /     # This request will use `fr` accept-language
+
+# You can pass query params as usual
+GET /search/code?q=user%3Abaverman+python&page=1
+
+# But there is a special syntax. `=` defines query string params
+GET /search/code q="user:baverman python" page=1
+
+# It uses shell-like rules to detect request parts
+# For example space escape with backslash
+GET /search/code q=user:baverman\ python page=1
+
+# `:=` used for form params. This request will return 422
+# You can see it's body in a Request buffer (:b __vial_http_req__)
+# In that case content-type will be `application/x-www-form-urlencoded`
+POST /search/code q:="user:baverman python" page:=1
+
+# `:` used to define request specific headers
+GET /search/code q="user:baverman python" User-Agent:evil-github-bot
+
+# All non empty lines after request line are treated as request body
+# 422 again, but you get the point
+# If body looks like json content-type will be `application/json`
+GET /search/code
+{
+    "q": "user:baverman python"
+}
+
+# That's it!
