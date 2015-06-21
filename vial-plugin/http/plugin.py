@@ -9,10 +9,8 @@ from vial import vfunc, vim
 from vial.utils import focus_window
 from vial.widgets import make_scratch
 
-SCRATCH = '__vial_http__'
 header_regex = re.compile(r'^\+?[-\w\d]+$')
 value_regex = re.compile(r'^([-_\w\d]+)(:=|=|:)(.+)$')
-last_result = {}
 
 
 def send_collector(connection):
@@ -122,7 +120,6 @@ def http():
     line, _ = vim.current.window.cursor
     line -= 1
 
-    last_result.clear()
     headers = get_headers(lines, line)
     method, url, query, body = get_request(lines, line, headers)
 
@@ -153,50 +150,29 @@ def http():
     response = cn.getresponse()
     rtime = int((time.time() - start) * 1000)
 
-    last_result['request'] = cn._sdata.splitlines()
-    last_result['resp_headers'] = [r.rstrip('\r\n') for r in response.msg.headers]
-
     cwin = vim.current.window
-    win, buf = make_scratch(SCRATCH)
-    win.options['statusline'] = 'vial-http: {} {} {}ms {}ms'.format(
-        response.status, response.reason, rtime, ctime)
+
+    win, buf = make_scratch('__vial_http_req__', title='Request')
+    buf[:] = cn._sdata.splitlines()
+    win.cursor = 1, 0
+
+    win, buf = make_scratch('__vial_http_hdr__', title='Response headers')
+    buf[:] = [r.rstrip('\r\n') for r in response.msg.headers]
+    win.cursor = 1, 0
 
     content = response.read()
     try:
         jdata = json.loads(content)
         content = json.dumps(jdata, ensure_ascii=False, sort_keys=True, indent=2)
-        buf.vars['resp_body_ft'] = 'json'
+        ctype = 'json'
     except ValueError:
-        buf.vars['resp_body_ft'] = 'html'
+        ctype = 'html'
 
-    last_result['resp_body'] = content.splitlines()
-    show_resp_body(False, buf, win)
+    win, buf = make_scratch('__vial_http__')
+    win.options['statusline'] = 'Response: {} {} {}ms {}ms'.format(
+        response.status, response.reason, rtime, ctime)
+    vim.command('set filetype={}'.format(ctype))
+    buf[:] = content.splitlines()
+    win.cursor = 1, 0
+
     focus_window(cwin)
-
-
-def show_request(r='request'):
-    if r in last_result:
-        cwin = vim.current.window
-        win, buf = make_scratch(SCRATCH)
-        vim.command('set filetype=')
-        buf[:] = last_result[r]
-        win.cursor = 1, 0
-        focus_window(cwin)
-
-
-def show_resp_headers():
-    show_request('resp_headers')
-
-
-def show_resp_body(scratch=True, buf=None, win=None):
-    if 'resp_body' in last_result:
-        if scratch:
-            cwin = vim.current.window
-            win, buf = make_scratch(SCRATCH)
-
-        vim.command('set filetype={}'.format(buf.vars['resp_body_ft']))
-        buf[:] = last_result['resp_body']
-        win.cursor = 1, 0
-
-        if scratch:
-            focus_window(cwin)
