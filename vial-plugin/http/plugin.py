@@ -4,6 +4,7 @@ import re
 import time
 import urllib
 import urlparse
+import shlex
 
 from vial import vfunc, vim
 from vial.utils import focus_window
@@ -25,7 +26,7 @@ def send_collector(connection):
 
 class Headers(object):
     def __init__(self):
-        self.headers = []
+        self.headers = [('User-Agent', 'vial-http')]
 
     def set(self, header, value):
         self.headers = [r for r in self.headers if r[0].lower() != header.lower()]
@@ -73,7 +74,7 @@ def get_headers(lines, line):
 
 
 def get_request(lines, line, headers):
-    parts = lines[line].split()
+    parts = shlex.split(lines[line], True)
     method = parts[0]
     url = parts[1]
     query = []
