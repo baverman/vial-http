@@ -19,6 +19,8 @@ vial-http is pathogen friendly and only requires vial to be installed::
     git clone https://github.com/baverman/vial.git
     git clone https://github.com/baverman/vial-http.git
 
+Note: vim should be compiled with python (not python3) support.
+
 
 ## Docs
 
