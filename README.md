@@ -25,8 +25,8 @@ Note: vim should be compiled with python (not python3) support.
 
 ## Docs
 
-`:VialHttp`: command executes request line under the cursor
-`VialHttpBasicAuth()`: function makes `Authorization` header
+* `:VialHttp` command executes request line under the cursor
+* `VialHttpBasicAuth()` function makes `Authorization` header
 
 [Example session](doc/example.http)
 
