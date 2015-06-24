@@ -177,3 +177,11 @@ def http():
     win.cursor = 1, 0
 
     focus_window(cwin)
+
+
+def basic_auth():
+    user = vfunc.input('Username: ')
+    if not user:
+        return
+    password = vfunc.inputsecret('Password: ')
+    return 'Authorization: Basic ' + '{}:{}'.format(user, password).encode('base64')

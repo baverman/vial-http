@@ -9,6 +9,7 @@ Simple http rest tool for vim
 * Automatic json response formatter
 * Separate buffers for response body, response headers and request
 * DRY
+* Support for HTTP basic auth
 
 
 ## Install
@@ -24,7 +25,8 @@ Note: vim should be compiled with python (not python3) support.
 
 ## Docs
 
-The only command is `:VialHttp`, it executes request line under the cursor
+`:VialHttp`: command executes request line under the cursor
+`VialHttpBasicAuth()`: function makes `Authorization` header
 
 [Example session](doc/example.http)
 

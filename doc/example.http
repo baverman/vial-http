@@ -42,4 +42,15 @@ GET /search/code
     "q": "user:baverman python"
 }
 
+# There is a VialHttpBasicAuth() function to make an `Authorization`
+# HTTP basic auth header. For example you can define normal mode mapping
+# :nnoremap <buffer> <leader>ba o<c-r>=VialHttpBasicAuth()<cr>
+# to insert it on new line.
+
+# Or you can do `o<c-r>=VialHttpB<tab><cr>` for now and type your GH credentials
+# and then call /user
+
+GET /user
+
+
 # That's it!
