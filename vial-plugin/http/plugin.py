@@ -137,7 +137,8 @@ def http():
         path += '?' + urllib.urlencode(query)
 
     if u.scheme == 'https':
-        cn = httplib.HTTPSConnection(u.hostname, u.port or 443)
+        import ssl
+        cn = httplib.HTTPSConnection(u.hostname, u.port or 443, context=ssl._create_unverified_context())
     else:
         cn = httplib.HTTPConnection(u.hostname, u.port or 80)
 
