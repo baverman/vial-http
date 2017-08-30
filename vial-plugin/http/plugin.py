@@ -1,3 +1,4 @@
+import os.path
 import httplib
 import json
 import re
@@ -9,9 +10,10 @@ import shlex
 from vial import vfunc, vim
 from vial.utils import focus_window
 from vial.widgets import make_scratch
+from .multipart import encode_multipart
 
 header_regex = re.compile(r'^\+?[-\w\d]+$')
-value_regex = re.compile(r'^([-_\w\d]+)(:=|=|:)(.+)$')
+value_regex = re.compile(r'^([-_\w\d]+)(:=|@=|=|:)(.+)$')
 
 
 def send_collector(connection):
@@ -31,6 +33,10 @@ class Headers(object):
     def set(self, header, value):
         self.headers = [r for r in self.headers if r[0].lower() != header.lower()]
         self.headers.append((header, value))
+
+    def update(self, headers):
+        for k, v in headers.items():
+            self.set(k, v)
 
     def add(self, header, value):
         self.headers.append((header, value))
@@ -79,6 +85,7 @@ def get_request(lines, line, headers):
     url = parts[1]
     query = []
     form = []
+    files = []
     body = None
     for p in parts[2:]:
         m = value_regex.match(p)
@@ -92,12 +99,24 @@ def get_request(lines, line, headers):
                 headers.set(param, value)
             elif op == ':=':
                 form.append((param, value))
+            elif op == '@=':
+                fname = os.path.basename(value)
+                with open(value, 'rb') as f:
+                    content = f.read()
+                files.append((param, {'filename': fname, 'content': content}))
 
-    if form:
+    content_type_is_set = False
+    if not content_type_is_set and files:
+        body, h = encode_multipart(form, files)
+        headers.update(h)
+        content_type_is_set = True
+
+    if not content_type_is_set and form:
         body = urllib.urlencode(form)
         headers.set('Content-Type', 'application/x-www-form-urlencoded')
+        content_type_is_set = True
 
-    if not form:
+    if not content_type_is_set:
         bodylines = []
         for l in lines[line+1:]:
             if not l:
