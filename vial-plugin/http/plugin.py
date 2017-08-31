@@ -79,7 +79,17 @@ def get_headers(lines, line):
     return headers
 
 
+def find_request_start(lines, line):
+    l = line
+    while l > 0:
+        if not lines[l-1].strip():
+            return l
+
+    return line
+
+
 def get_request(lines, line, headers):
+    line = find_request_start(lines, line)
     parts = shlex.split(lines[line], True)
     method = parts[0]
     url = parts[1]
