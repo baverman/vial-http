@@ -85,7 +85,8 @@ def get_headers(lines, line):
 def find_request_start(lines, line):
     l = line
     while l > 0:
-        if not lines[l-1].strip():
+        lcontent = lines[l-1]
+        if not lcontent.strip() or lcontent[0] == '#':
             return l
         l -= 1
 
