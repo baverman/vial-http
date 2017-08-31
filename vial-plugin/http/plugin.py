@@ -15,6 +15,9 @@ from .multipart import encode_multipart
 header_regex = re.compile(r'^\+?[-\w\d]+$')
 value_regex = re.compile(r'^([-_\w\d]+)(:=|@=|=|:)(.+)$')
 
+CONNECT_TIMEOUT = 5
+READ_TIMEOUT = 30
+
 
 def send_collector(connection):
     connection._sdata = ''
@@ -153,9 +156,11 @@ def http():
     headers = get_headers(lines, line)
     method, url, query, body = get_request(lines, line, headers)
 
-    host = headers.pop('host', '')
     u = urlparse.urlsplit(url)
     if not u.hostname:
+        host = headers.pop('host', '')
+        if not host.startswith('http://') and not host.startswith('https://'):
+            host = 'http://' + host
         u = urlparse.urlsplit(host + url)
 
     if u.query:
@@ -167,15 +172,20 @@ def http():
 
     if u.scheme == 'https':
         import ssl
-        cn = httplib.HTTPSConnection(u.hostname, u.port or 443, context=ssl._create_unverified_context())
+        cn = httplib.HTTPSConnection(u.hostname, u.port or 443,
+                                     timeout=CONNECT_TIMEOUT,
+                                     context=ssl._create_unverified_context())
     else:
-        cn = httplib.HTTPConnection(u.hostname, u.port or 80)
+        cn = httplib.HTTPConnection(u.hostname, u.port or 80,
+                                    timeout=CONNECT_TIMEOUT)
 
     cn = send_collector(cn)
 
     start = time.time()
     cn.connect()
     ctime = int((time.time() - start) * 1000)
+
+    cn.sock.settimeout(READ_TIMEOUT)
 
     cn.request(method, path, body, headers)
     response = cn.getresponse()
