@@ -87,6 +87,7 @@ def find_request_start(lines, line):
     while l > 0:
         if not lines[l-1].strip():
             return l
+        l -= 1
 
     return line
 
