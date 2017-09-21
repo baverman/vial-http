@@ -1,0 +1,79 @@
+GET https://vial-http.appspot.com/
+
+Host: https://vial-http.appspot.com
+# Accept-Language: en
+# Cookie: foo=bar
+
+GET /headers
+
+GET /query?q=some%3Astring+with+spaces&page=1
+
+GET /query q="some:string with spaces" page=1
+
+GET /query q=some:string\ with\ spaces page=1
+
+GET /query q=query User-Agent:evil-github-bot
+
+POST /body
+some body
+for request
+
+POST /body << HEREDOC
+
+some
+
+body
+HEREDOC
+
+POST /body < /tmp/some.data
+
+POST /form Content-Type:application/x-www-form-urlencoded
+p1=boo&p2=10
+
+POST /form p1:=boo p2:=10
+
+POST /json
+{
+    "p1": "boo",
+    "p2": "10"
+}
+
+POST /multipart p1:=boo p2:=10 Content-Type:multipart/form-data
+
+POST /multipart p1:=boo p2:=10 file@=/tmp/some.data
+
+GET /auth/basic
+
+Authorization: Basic dXNlcjpwYXNz
+
+GET /auth/basic
+
+POST /auth/email email:=__input__ password:=__pwd__
+
+# ---------
+
+TEMPLATE cookies
+${set_cookies()}
+
+TEMPLATE body-token
+Authorization-Token: ${json["token"]}
+
+TEMPLATE hdr-token
+Authorization-Token: ${headers["token"]}
+
+TEMPLATE check-status << HERE
+GET /order/status id=${json["id"]}
+
+DELETE /order id=${json["id"]}
+HERE
+
+POST /auth/email email:=boo password:=foo | body-token
+
+Authorization-Token: boofoo
+
+POST /auth/email email:=boo password:=foo | hdr-token
+
+POST /auth/email email:=boo password:=foo | cookies
+
+
+POST /order | check-status

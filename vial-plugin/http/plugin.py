@@ -1,153 +1,20 @@
-import os.path
-import httplib
 import json
-import re
 import time
 import urllib
+import httplib
 import urlparse
-import shlex
+import Cookie
 
 from vial import vfunc, vim
 from vial.utils import focus_window
+from vial.helpers import echoerr
 from vial.widgets import make_scratch
-from .multipart import encode_multipart
 
-header_regex = re.compile(r'^\+?[-\w\d]+$')
-value_regex = re.compile(r'^([-_\w\d]+)(:=|@=|=|:)(.+)$')
+from .util import (get_headers_and_templates, send_collector, prepare_request, PrepareException,
+                   render_template, Headers)
 
 CONNECT_TIMEOUT = 5
 READ_TIMEOUT = 30
-
-
-def send_collector(connection):
-    connection._sdata = ''
-    oldsend = connection.send
-    def send(data):
-        connection._sdata += data
-        return oldsend(data)
-    connection.send = send
-    return connection
-
-
-class Headers(object):
-    def __init__(self):
-        self.headers = [('User-Agent', 'vial-http')]
-
-    def set(self, header, value):
-        self.headers = [r for r in self.headers if r[0].lower() != header.lower()]
-        self.headers.append((header, value))
-
-    def update(self, headers):
-        for k, v in headers.items():
-            self.set(k, v)
-
-    def add(self, header, value):
-        self.headers.append((header, value))
-
-    def __contains__(self, header):
-        return any(h.lower() == header.lower() for h, _ in self.headers)
-
-    def pop(self, header, default=None):
-        result = default
-        headers = []
-        for h, v in self.headers:
-            if h.lower() == header.lower():
-                result = v
-            else:
-                headers.append((h, v))
-        self.headers = headers
-        return result
-
-    def iteritems(self):
-        return self.headers
-
-    def __iter__(self):
-        return (h for h, _ in self.headers)
-
-
-def get_headers(lines, line):
-    headers = Headers()
-    for l in lines[:line]:
-        try:
-            header, value = l.split(':', 1)
-        except ValueError:
-            continue
-
-        if header_regex.match(header):
-            if header[0] == '+':
-                headers.add(header[1:], value.strip())
-            else:
-                headers.set(header, value.strip())
-
-    return headers
-
-
-def find_request_start(lines, line):
-    l = line
-    while l > 0:
-        lcontent = lines[l-1]
-        if not lcontent.strip() or lcontent[0] == '#':
-            return l
-        l -= 1
-
-    return line
-
-
-def get_request(lines, line, headers):
-    line = find_request_start(lines, line)
-    parts = shlex.split(lines[line], True)
-    method = parts[0]
-    url = parts[1]
-    query = []
-    form = []
-    files = []
-    body = None
-    for p in parts[2:]:
-        m = value_regex.match(p)
-        if m:
-            param, op, value = m.group(1, 2, 3)
-            if value == '__pwd__':
-                value = vfunc.inputsecret('{}: '.format(param))
-            if op == '=':
-                query.append((param, value))
-            elif op == ':':
-                headers.set(param, value)
-            elif op == ':=':
-                form.append((param, value))
-            elif op == '@=':
-                fname = os.path.basename(value)
-                with open(value, 'rb') as f:
-                    content = f.read()
-                files.append((param, {'filename': fname, 'content': content}))
-
-    content_type_is_set = False
-    if not content_type_is_set and files:
-        body, h = encode_multipart(form, files)
-        headers.update(h)
-        content_type_is_set = True
-
-    if not content_type_is_set and form:
-        body = urllib.urlencode(form)
-        headers.set('Content-Type', 'application/x-www-form-urlencoded')
-        content_type_is_set = True
-
-    if not content_type_is_set:
-        bodylines = []
-        for l in lines[line+1:]:
-            if not l:
-                break
-            bodylines.append(l)
-
-        if bodylines:
-            body = '\n'.join(bodylines)
-            try:
-                json.loads(body)
-                if 'content-type' not in headers:
-                    headers.set('Content-Type', 'application/json')
-            except ValueError:
-                pass
-
-    return method, url, query, body
 
 
 def http():
@@ -155,8 +22,14 @@ def http():
     line, _ = vim.current.window.cursor
     line -= 1
 
-    headers = get_headers(lines, line)
-    method, url, query, body = get_request(lines, line, headers)
+    headers, templates = get_headers_and_templates(lines, line)
+    pwd_func = lambda p: vfunc.inputsecret('{}: '.format(p))
+    input_func = lambda p: vfunc.input('{}: '.format(p))
+    try:
+        method, url, query, body, tlist, rend = prepare_request(lines, line, headers, input_func, pwd_func)
+    except PrepareException as e:
+        echoerr(str(e))
+        return
 
     u = urlparse.urlsplit(url)
     if not u.hostname:
@@ -210,20 +83,58 @@ def http():
         ctype = 'json'
     except ValueError:
         ctype = 'html'
+        jdata = {}
 
     win, buf = make_scratch('__vial_http__')
     win.options['statusline'] = 'Response: {} {} {}ms {}ms'.format(
-        response.status, response.reason, rtime, ctime)
+        response.status, response.reason, ctime, rtime)
     vim.command('set filetype={}'.format(ctype))
-    buf[:] = content.splitlines()
+    buf[:] = content.splitlines(False)
     win.cursor = 1, 0
 
     focus_window(cwin)
 
+    cj = Cookie.SimpleCookie()
+    for h in response.msg.getheaders('set-cookie'):
+        cj.load(h)
+    rcookies = {k: v.value for k, v in cj.items()}
+    cookies = {k: v.coded_value for k, v in cj.items()}
 
-def basic_auth():
+    def set_cookies(*args):
+        args = args or sorted(cookies.keys())
+        return 'Cookie: ' + ';'.join('{}={}'.format(k, cookies[k]) for k in args)
+
+    ctx = {'body': content, 'json': jdata,
+           'headers': Headers(response.getheaders()),
+           'cookies': cookies,
+           'rcookies': rcookies,
+           'set_cookies': set_cookies}
+
+    for t in tlist:
+        if t in templates:
+            lines = render_template(templates[t], **ctx).splitlines()
+        else:
+            lines = ['ERROR: template {} not found'.format(t)]
+        vfunc.append(rend + 1, [''] + lines)
+        rend += 1 + len(lines)
+
+
+def basic_auth(user, password):
+    return 'Authorization: Basic ' + '{}:{}'.format(user, password).encode('base64').strip()
+
+
+def basic_auth_func():
     user = vfunc.input('Username: ')
     if not user:
         return
     password = vfunc.inputsecret('Password: ')
-    return 'Authorization: Basic ' + '{}:{}'.format(user, password).encode('base64')
+    return basic_auth(user, password)
+
+
+def basic_auth_cmd(user=None):
+    if not user:
+        user = vfunc.input('Username: ')
+    if not user:
+        return
+    password = vfunc.inputsecret('Password: ')
+    vfunc.append(vfunc.line('.'), basic_auth(user, password))

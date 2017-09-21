@@ -1,7 +1,7 @@
 # This an example http session
 # Place cursor on a request line and do :HttpVial
 
-GET https://api.github.com    # Simple get. Comments can be on a request line too.
+GET http://127.0.0.1:9000    # Simple get. Comments can be on a request line too.
 
 # You can define default host and headers
 Host: https://api.github.com

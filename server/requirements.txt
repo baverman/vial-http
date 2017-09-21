@@ -1,0 +1,2 @@
+covador==0.9.14
+Werkzeug==0.12.2

@@ -1,11 +1,16 @@
 # vial-http
-Simple http rest tool for vim
+Awesome http REST tool for vim
+
+[Templates](doc/tutorial.rst#handle-state-via-templates) in action:
+![templates](img/templates.gif)
 
 
 ## Features:
 
-* Intuitive syntax
-* Response and connection times
+* Intuitive syntax mimics HTTP protocol
+* Templates to capture state
+* Response and connection times in status line
+* Automatic json request body detector
 * Automatic json response formatter
 * Separate buffers for response body, response headers and request
 * DRY
@@ -14,26 +19,30 @@ Simple http rest tool for vim
 
 ## Install
 
-vial-http is pathogen friendly and only requires vial to be installed::
+vial-http is pathogen friendly and only requires vial to be installed:
 
     cd ~/.vim/bundle
     git clone https://github.com/baverman/vial.git
     git clone https://github.com/baverman/vial-http.git
+
+or for Plug:
+
+    Plug 'baverman/vial'
+    Plug 'baverman/vial-http'
 
 Note: vim should be compiled with python (not python3) support.
 
 
 ## Docs
 
-* `:VialHttp` command executes request line under the cursor
-* `VialHttpBasicAuth()` function makes `Authorization` header
+Keymap:
 
-[Example session](doc/example.http)
+* `<leader><cr>` executes request line under the cursor
+* `<c-k>`/`<c-j>` cycle throw response/request/response headers windows
 
-Example binds to cycle between req/resp buffers:
+Commands:
 
-    au BufNewFile __vial_http__ nnoremap <buffer> <silent> <c-k> :b __vial_http_req__<cr>
-    au BufNewFile __vial_http_req__ nnoremap <buffer> <silent> <c-k> :b __vial_http_hdr__<cr>
-    au BufNewFile __vial_http_hdr__ nnoremap <buffer> <silent> <c-k> :b __vial_http__<cr>
+* `:VialHttp` executes request line under the cursor
+* `:VialHttpBasicAuth [username]` makes `Authorization` header
 
-![vial-http](img/vial-http.png)
+[Tutorial](doc/tutorial.rst)
