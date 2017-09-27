@@ -5,16 +5,65 @@ import httplib
 import urlparse
 import Cookie
 
+from xml.etree import cElementTree as etree
+from cStringIO import StringIO
+
 from vial import vfunc, vim
 from vial.utils import focus_window
 from vial.helpers import echoerr
 from vial.widgets import make_scratch
 
 from .util import (get_headers_and_templates, send_collector, prepare_request, PrepareException,
-                   render_template, Headers)
+                   render_template, Headers, pretty_xml)
 
 CONNECT_TIMEOUT = 5
 READ_TIMEOUT = 30
+XML_FORMAT_SIZE_THRESHOLD = 2 ** 20
+
+
+def sizeof_fmt(num, suffix='b'):
+    for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
+        if abs(num) < 1024.0:
+            if not unit:
+                return "%d%s%s" % (num, unit, suffix)
+            else:
+                return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
+
+
+def format_json(content):
+    try:
+        jdata = json.loads(content)
+    except:
+        jdata = {}
+    else:
+        content = json.dumps(jdata, ensure_ascii=False, sort_keys=True, indent=2)
+
+    return content, 'json', jdata
+
+
+def format_xml(content):
+    if len(content) < XML_FORMAT_SIZE_THRESHOLD:
+        buf = StringIO()
+        try:
+            pretty_xml(content, buf)
+        except:
+            pass
+        else:
+            content = buf.getvalue()
+    return content, 'xml', {}
+
+
+def format_content(content_type, content):
+    if content_type == 'application/json':
+        return format_json(content)
+    elif content_type == 'text/html':
+        return content, 'html', {}
+    elif content_type in ('application/xml', 'text/xml', 'text/plain') or content_type.endswith('+xml'):
+        return format_xml(content)
+
+    return content, 'text', {}
 
 
 def http():
@@ -38,12 +87,12 @@ def http():
             host = 'http://' + host
         u = urlparse.urlsplit(host + url)
 
-    if u.query:
-        query = urlparse.parse_qsl(u.query, True) + query
-
     path = u.path
+    if u.query:
+        path += '?' + u.query
+
     if query:
-        path += '?' + urllib.urlencode(query)
+        path += ('&' if u.query else '?') + urllib.urlencode(query)
 
     if u.scheme == 'https':
         import ssl
@@ -77,17 +126,17 @@ def http():
     win.cursor = 1, 0
 
     content = response.read()
-    try:
-        jdata = json.loads(content)
-        content = json.dumps(jdata, ensure_ascii=False, sort_keys=True, indent=2)
-        ctype = 'json'
-    except ValueError:
-        ctype = 'html'
-        jdata = {}
+    size = len(content)
+
+    win, buf = make_scratch('__vial_http_raw__', title='Raw Response')
+    buf[:] = content.splitlines()
+    win.cursor = 1, 0
+
+    content, ctype, jdata = format_content(response.msg.gettype(), content)
 
     win, buf = make_scratch('__vial_http__')
-    win.options['statusline'] = 'Response: {} {} {}ms {}ms'.format(
-        response.status, response.reason, ctime, rtime)
+    win.options['statusline'] = 'Response: {} {} {}ms {}ms {}'.format(
+        response.status, response.reason, ctime, rtime, sizeof_fmt(size))
     vim.command('set filetype={}'.format(ctype))
     buf[:] = content.splitlines(False)
     win.cursor = 1, 0

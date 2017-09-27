@@ -1,3 +1,15 @@
+0.3
+===
+
+* [Feature] response size in status line.
+
+* [Feature] XML formatting.
+
+* [Feature] raw response window (you can see unformatted html/json/html).
+
+* [Fix] query string merge (requests like ``/url?wsdl`` are send as ``/url?wsdl=``).
+
+
 0.2
 ===
 

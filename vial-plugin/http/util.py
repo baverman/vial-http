@@ -4,10 +4,14 @@ import shlex
 import json
 import urllib
 
+from cStringIO import StringIO
+from xml.etree import cElementTree as etree
+
 from .multipart import encode_multipart
 
 header_regex = re.compile(r'^\+?[-\w\d]+$')
 value_regex = re.compile(r'^([-_\w\d]+)(:=|@=|=|:)(.+)$')
+
 
 class PrepareException(Exception): pass
 
@@ -276,3 +280,90 @@ def render_template(template, **ctx):
         return re.sub(r'\$\{(.+?)\}', sub, template)
     except Exception as e:
         return 'ERROR: {}'.format(e)
+
+
+def pretty_xml(text, out, ident='  '):
+    from xml.sax.saxutils import quoteattr, escape
+    from collections import Counter
+
+    ns_aliases = {}
+    ns_cache = {}
+    ns_cnt = Counter()
+    def get_alias(tag):
+        try:
+            return ns_cache[tag]
+        except KeyError:
+            pass
+
+        pos = tag.find('}')
+        if pos < 0:
+            result = tag
+        else:
+            rtag = tag[pos+1:]
+            prefix = ns_aliases[tag[1:pos]]
+            result = '{}:{}'.format(prefix, rtag) if prefix else rtag
+
+        ns_cache[tag] = result
+        return result
+
+    buf = StringIO(text)
+    for (event, elem) in etree.iterparse(buf, ('start-ns',)):
+        alias = elem[0]
+        if alias in ns_cnt:
+            if not alias:
+                alias = 'ns'
+
+            falias = alias
+            while falias in ns_cnt:
+                ns_cnt[alias] += 1
+                falias = '{}{}'.format(alias, ns_cnt[alias])
+            alias = falias
+
+        ns_aliases[elem[1]] = alias
+
+    def _render(elem, level, first, use_level):
+        tag = get_alias(elem.tag)
+        attrib = ['{}={}'.format(get_alias(k), quoteattr(v)) for k, v in sorted(elem.attrib.items())]
+        attrib = (' ' + ' '.join(attrib)) if attrib else ''
+        if first:
+            ns = ' ' + ' '.join('xmlns{}={}'.format((':' + v) if v else v, quoteattr(k)) for k, v in ns_aliases.items())
+        else:
+            ns = ''
+
+        if use_level:
+            nl = '\n' + ident * level
+        else:
+            nl = ''
+
+        txt = elem.text
+        txt = escape(txt) if txt and txt.strip() else ''
+
+        tail = txt
+        has_children = False
+        for child in elem:
+            if not has_children:
+                out.write(u'{}<{}{}{}>{}'.format(nl, tag, ns, attrib, txt).encode('utf-8'))
+            has_children = True
+            _render(child, level+1, False, not tail)
+            tail = child.tail
+            tail = escape(txt) if tail and tail.strip() else ''
+            if tail:
+                out.write(tail)
+
+        if has_children:
+            if not tail:
+                nl = '\n' + ident * level
+            else:
+                nl = ''
+
+            out.write(u'{}</{}>'.format(nl, tag, txt).encode('utf-8'))
+        else:
+            if txt:
+                out.write(u'{}<{}{}{}>{}</{}>'.format(nl, tag, ns, attrib, txt, tag).encode('utf-8'))
+            else:
+                out.write(u'{}<{}{}{}/>'.format(nl, tag, ns, attrib, txt).encode('utf-8'))
+
+        return txt
+
+    buf.seek(0)
+    _render(etree.parse(buf).getroot(), 0, True, False)

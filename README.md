@@ -11,7 +11,7 @@ Awesome http REST tool for vim
 * Templates to capture state
 * Response and connection times in status line
 * Automatic json request body detector
-* Automatic json response formatter
+* Automatic json/xml response formatter
 * Separate buffers for response body, response headers and request
 * DRY
 * Support for HTTP basic auth
