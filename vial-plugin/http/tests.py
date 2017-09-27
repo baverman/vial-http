@@ -122,4 +122,4 @@ def test_pretty_xml():
             <d:child>zoo</d:child>
             <d:child>hoo</d:child>
         </root>''', buf)
-    print buf.getvalue()
+    print(buf.getvalue())
