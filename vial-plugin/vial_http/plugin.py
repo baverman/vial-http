@@ -1,17 +1,27 @@
 import json
 import time
-import urllib
-import httplib
-import urlparse
-import Cookie
 
 from xml.etree import cElementTree as etree
-from cStringIO import StringIO
 
 from vial import vfunc, vim
 from vial.utils import focus_window
 from vial.helpers import echoerr
 from vial.widgets import make_scratch
+from vial.compat import PY2, iteritems, bstr
+
+if PY2:
+    import urllib
+    import httplib
+    import urlparse
+    import Cookie
+    from cStringIO import StringIO
+else:
+    from http import cookies as Cookie
+    from http import client as httplib
+    from urllib import parse as urlparse
+    from urllib import parse as urllib
+    from io import BytesIO as StringIO
+
 
 from .util import (get_headers_and_templates, send_collector, prepare_request, PrepareException,
                    render_template, Headers, pretty_xml)
@@ -122,7 +132,11 @@ def http():
     win.cursor = 1, 0
 
     win, buf = make_scratch('__vial_http_hdr__', title='Response headers')
-    buf[:] = [r.rstrip('\r\n') for r in response.msg.headers]
+    if PY2:
+        buf[:] = [r.rstrip('\r\n') for r in response.msg.headers]
+    else:
+        buf[:] = ['{}: {}'.format(*r).encode('utf-8') for r in response.msg._headers]
+
     win.cursor = 1, 0
 
     content = response.read()
@@ -132,7 +146,12 @@ def http():
     buf[:] = content.splitlines()
     win.cursor = 1, 0
 
-    content, ctype, jdata = format_content(response.msg.gettype(), content)
+    if PY2:
+        rcontent_type = response.msg.gettype()
+    else:
+        rcontent_type = response.msg.get_content_type()
+
+    content, ctype, jdata = format_content(rcontent_type, content)
 
     win, buf = make_scratch('__vial_http__')
     win.options['statusline'] = 'Response: {} {} {}ms {}ms {}'.format(
@@ -144,10 +163,14 @@ def http():
     focus_window(cwin)
 
     cj = Cookie.SimpleCookie()
-    for h in response.msg.getheaders('set-cookie'):
+    if PY2:
+        cheaders = response.msg.getheaders('set-cookie')
+    else:
+        cheaders = response.msg.get_all('set-cookie')
+    for h in cheaders or []:
         cj.load(h)
-    rcookies = {k: v.value for k, v in cj.items()}
-    cookies = {k: v.coded_value for k, v in cj.items()}
+    rcookies = {k: v.value for k, v in iteritems(cj)}
+    cookies = {k: v.coded_value for k, v in iteritems(cj)}
 
     def set_cookies(*args):
         args = args or sorted(cookies.keys())
@@ -169,7 +192,8 @@ def http():
 
 
 def basic_auth(user, password):
-    return 'Authorization: Basic ' + '{}:{}'.format(user, password).encode('base64').strip()
+    from base64 import b64encode
+    return b'Authorization: Basic ' + b64encode(b'%s:%s' % (bstr(user), bstr(password)))
 
 
 def basic_auth_func():

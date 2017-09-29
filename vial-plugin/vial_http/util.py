@@ -2,10 +2,17 @@ import os.path
 import re
 import shlex
 import json
-import urllib
 
-from cStringIO import StringIO
 from xml.etree import cElementTree as etree
+
+from vial.compat import PY2, bstr, filter
+
+if PY2:
+    import urllib
+    from cStringIO import StringIO
+else:
+    from urllib import parse as urllib
+    from io import BytesIO as StringIO
 
 from .multipart import encode_multipart
 
@@ -164,13 +171,13 @@ def prepare_request(lines, line, headers, input_func=None, pwd_func=None):
 
 
 def send_collector(connection):
-    connection._sdata = ''
+    connection._sdata = b''
     oldsend = connection.send
     def send(data):
         if len(connection._sdata) <= 65536:
             connection._sdata += data
             if len(connection._sdata) > 65536:
-                connection._sdata += '\n...TRUNCATED...'
+                connection._sdata += b'\n...TRUNCATED...'
         return oldsend(data)
     connection.send = send
     return connection
@@ -218,6 +225,9 @@ class Headers(object):
         return result
 
     def iteritems(self):
+        return self.headers
+
+    def items(self):
         return self.headers
 
     def __iter__(self):
@@ -348,7 +358,7 @@ def pretty_xml(text, out, ident='  '):
             tail = child.tail
             tail = escape(txt) if tail and tail.strip() else ''
             if tail:
-                out.write(tail)
+                out.write(bstr(tail, 'utf-8'))
 
         if has_children:
             if not tail:

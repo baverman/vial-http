@@ -1,7 +1,8 @@
+from __future__ import print_function
 from textwrap import dedent
 
 from .util import (parse_request_line, render_template, get_headers_and_templates,
-                   find_request, pretty_xml)
+                   find_request, pretty_xml, StringIO)
 
 
 def fill(param):
@@ -111,10 +112,9 @@ def test_find_request():
 
 
 def test_pretty_xml():
-    from cStringIO import StringIO
     buf = StringIO()
 
-    pretty_xml('''\
+    pretty_xml(b'''\
         <root xmlns:d='http://boo' xmlns="http://boom">
             <d:child d:foo="boo">some text&gt;<child2 xmlns:foo='http//foo'>text</child2>another text</d:child>
             <d:child>boo</d:child>
@@ -122,4 +122,4 @@ def test_pretty_xml():
             <d:child>zoo</d:child>
             <d:child>hoo</d:child>
         </root>''', buf)
-    print buf.getvalue()
+    print(buf.getvalue())

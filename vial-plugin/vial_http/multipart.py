@@ -2,6 +2,8 @@ import mimetypes
 import random
 import string
 
+from vial.compat import bstr
+
 _BOUNDARY_CHARS = string.digits + string.ascii_letters
 
 
@@ -32,18 +34,18 @@ def encode_multipart(fields, files, boundary=None):
     193
     """
     def escape_quote(s):
-        return s.replace('"', '\\"')
+        return bstr(s).replace(b'"', b'\\"')
 
     if boundary is None:
-        boundary = ''.join(random.choice(_BOUNDARY_CHARS) for i in range(30))
+        boundary = ''.join(random.choice(_BOUNDARY_CHARS) for i in range(30)).encode('latin1')
     lines = []
 
     for name, value in fields:
         lines.extend((
-            '--{0}'.format(boundary),
-            'Content-Disposition: form-data; name="{0}"'.format(escape_quote(name)),
-            '',
-            str(value),
+            b'--%s' % boundary,
+            b'Content-Disposition: form-data; name="%s"' % escape_quote(name),
+            b'',
+            bstr(value, 'utf-8'),
         ))
 
     for name, value in files:
@@ -53,23 +55,23 @@ def encode_multipart(fields, files, boundary=None):
         else:
             mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
         lines.extend((
-            '--{0}'.format(boundary),
-            'Content-Disposition: form-data; name="{0}"; filename="{1}"'.format(
+            b'--%s' % boundary,
+            b'Content-Disposition: form-data; name="%s"; filename="%s"' % (
                     escape_quote(name), escape_quote(filename)),
-            'Content-Type: {0}'.format(mimetype),
-            '',
+            b'Content-Type: %s' % (bstr(mimetype)),
+            b'',
             value['content'],
         ))
 
     lines.extend((
-        '--{0}--'.format(boundary),
-        '',
+        b'--%s--' % boundary,
+        b'',
     ))
-    body = '\r\n'.join(lines)
+    body = b'\r\n'.join(lines)
 
     headers = {
-        'Content-Type': 'multipart/form-data; boundary={0}'.format(boundary),
-        'Content-Length': str(len(body)),
+        b'Content-Type': b'multipart/form-data; boundary=%s' % boundary,
+        b'Content-Length': bstr(str(len(body))),
     }
 
     return (body, headers)
