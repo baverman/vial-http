@@ -30,10 +30,20 @@ or for Plug:
     Plug 'baverman/vial'
     Plug 'baverman/vial-http'
 
-Note: vim should be compiled with python (not python3) support.
+Note: vim should be compiled with python or python3 support.
 
 
 ## Docs
+
+You need following options in your vimrc:
+
+    set hidden
+    filetype plugin on
+
+`hidden` must be set because Vial-Http uses non-file temporary offscreen
+buffers with response content and without `hidden` they will be empty.
+
+`filetype plugin on` needed for default keymap working.
 
 Keymap:
 
