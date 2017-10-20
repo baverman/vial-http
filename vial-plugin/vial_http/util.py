@@ -198,7 +198,7 @@ class Headers(object):
             return default
 
     def __getitem__(self, name):
-        result = [r[1] for r in self.headers if r[0].lower() == name]
+        result = [r[1] for r in self.headers if r[0].lower() == name.lower()]
         if not result:
             raise KeyError(name)
         return result[0]
