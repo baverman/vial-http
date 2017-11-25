@@ -333,8 +333,8 @@ def pretty_xml(text, out, ident='  '):
 
     def _render(elem, level, first, use_level):
         tag = get_alias(elem.tag)
-        attrib = ['{}={}'.format(get_alias(k), quoteattr(v)) for k, v in sorted(elem.attrib.items())]
-        attrib = (' ' + ' '.join(attrib)) if attrib else ''
+        attrib = ['{}={}'.format(get_alias(k), bstr(quoteattr(v), 'utf-8')) for k, v in sorted(elem.attrib.items())]
+        attrib = ((' ' + ' '.join(attrib)) if attrib else '').decode('utf-8')
         if first:
             ns = ' ' + ' '.join('xmlns{}={}'.format((':' + v) if v else v, quoteattr(k)) for k, v in ns_aliases.items())
         else:

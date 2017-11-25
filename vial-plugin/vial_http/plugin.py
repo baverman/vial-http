@@ -59,6 +59,8 @@ def format_xml(content):
         try:
             pretty_xml(content, buf)
         except:
+            import traceback
+            traceback.print_exc()
             pass
         else:
             content = buf.getvalue()
