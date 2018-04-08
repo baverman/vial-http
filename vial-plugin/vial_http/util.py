@@ -5,13 +5,15 @@ import json
 
 from xml.etree import cElementTree as etree
 
-from vial.compat import PY2, bstr, filter
+from vial.compat import PY2, bstr, filter, sstr, ustr
 
 if PY2:
     import urllib
+    import urlparse
     from cStringIO import StringIO
 else:
     from urllib import parse as urllib
+    from urllib import parse as urlparse
     from io import BytesIO as StringIO
 
 from .multipart import encode_multipart
@@ -333,10 +335,12 @@ def pretty_xml(text, out, ident='  '):
 
     def _render(elem, level, first, use_level):
         tag = get_alias(elem.tag)
-        attrib = ['{}={}'.format(get_alias(k), bstr(quoteattr(v), 'utf-8')) for k, v in sorted(elem.attrib.items())]
-        attrib = ((' ' + ' '.join(attrib)) if attrib else '').decode('utf-8')
+        attrib = ['{}={}'.format(get_alias(k), sstr(quoteattr(v), 'utf-8'))
+                  for k, v in sorted(elem.attrib.items())]
+        attrib = ustr((' ' + ' '.join(attrib)) if attrib else '', 'utf-8')
         if first:
-            ns = ' ' + ' '.join('xmlns{}={}'.format((':' + v) if v else v, quoteattr(k)) for k, v in ns_aliases.items())
+            ns = ' ' + ' '.join('xmlns{}={}'.format((':' + v) if v else v, quoteattr(k))
+                                for k, v in ns_aliases.items())
         else:
             ns = ''
 
@@ -377,3 +381,21 @@ def pretty_xml(text, out, ident='  '):
 
     buf.seek(0)
     _render(etree.parse(buf).getroot(), 0, True, False)
+
+
+def get_connection_settings(url, headers):
+    u = urlparse.urlsplit(url)
+    if not u.hostname:
+        host = headers.pop('host', '')
+        if not host.startswith('http://') and not host.startswith('https://'):
+            host = 'http://' + host
+        u = urlparse.urlsplit(host + url)
+
+    vconnect = headers.pop('vial-connect', None)
+    if vconnect:
+        if not vconnect.startswith('http://') and not vconnect.startswith('https://'):
+            vconnect = 'http://' + vconnect
+        vu = urlparse.urlsplit(vconnect)
+        return (vu.hostname, vu.port), u._replace(scheme=vu.scheme)
+
+    return (u.hostname, u.port), u

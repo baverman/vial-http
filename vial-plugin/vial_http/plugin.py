@@ -1,8 +1,6 @@
 import json
 import time
 
-from xml.etree import cElementTree as etree
-
 from vial import vfunc, vim
 from vial.utils import focus_window
 from vial.helpers import echoerr
@@ -12,19 +10,17 @@ from vial.compat import PY2, iteritems, bstr
 if PY2:
     import urllib
     import httplib
-    import urlparse
     import Cookie
     from cStringIO import StringIO
 else:
     from http import cookies as Cookie
     from http import client as httplib
-    from urllib import parse as urlparse
     from urllib import parse as urllib
     from io import BytesIO as StringIO
 
-
-from .util import (get_headers_and_templates, send_collector, prepare_request, PrepareException,
-                   render_template, Headers, pretty_xml)
+from .util import (get_headers_and_templates, send_collector, prepare_request,
+                   PrepareException, render_template, Headers, pretty_xml,
+                   get_connection_settings)
 
 CONNECT_TIMEOUT = 5
 READ_TIMEOUT = 30
@@ -93,12 +89,8 @@ def http():
     connect_timeout = float(headers.pop('Vial-Connect-Timeout', CONNECT_TIMEOUT))
     read_timeout = float(headers.pop('Vial-Timeout', READ_TIMEOUT))
 
-    u = urlparse.urlsplit(url)
-    if not u.hostname:
-        host = headers.pop('host', '')
-        if not host.startswith('http://') and not host.startswith('https://'):
-            host = 'http://' + host
-        u = urlparse.urlsplit(host + url)
+    (host, port), u = get_connection_settings(url, headers)
+    headers.set('Host', u.netloc)
 
     path = u.path
     if u.query:
@@ -109,11 +101,11 @@ def http():
 
     if u.scheme == 'https':
         import ssl
-        cn = httplib.HTTPSConnection(u.hostname, u.port or 443,
+        cn = httplib.HTTPSConnection(host, port or 443,
                                      timeout=connect_timeout,
                                      context=ssl._create_unverified_context())
     else:
-        cn = httplib.HTTPConnection(u.hostname, u.port or 80,
+        cn = httplib.HTTPConnection(host, port or 80,
                                     timeout=connect_timeout)
 
     cn = send_collector(cn)

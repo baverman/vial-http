@@ -2,7 +2,12 @@ from __future__ import print_function
 from textwrap import dedent
 
 from .util import (parse_request_line, render_template, get_headers_and_templates,
-                   find_request, pretty_xml, StringIO)
+                   find_request, pretty_xml, StringIO, get_connection_settings,
+                   Headers)
+
+
+def hdr(**kwargs):
+    return Headers(list(kwargs.items()))
 
 
 def fill(param):
@@ -123,3 +128,28 @@ def test_pretty_xml():
             <d:child>hoo</d:child>
         </root>''', buf)
     print(buf.getvalue())
+
+
+def test_connection_settings():
+    result = get_connection_settings('http://boo.loc/', hdr())
+    assert result == (('boo.loc', None), ('http', 'boo.loc', '/', '', ''))
+
+    result = get_connection_settings('http://boo.loc:8000/', hdr())
+    assert result == (('boo.loc', 8000), ('http', 'boo.loc:8000', '/', '', ''))
+
+    result = get_connection_settings('http://boo.loc/', hdr(host='foo.loc'))
+    assert result == (('boo.loc', None), ('http', 'boo.loc', '/', '', ''))
+
+    result = get_connection_settings('/', hdr(host='foo.loc'))
+    assert result == (('foo.loc', None), ('http', 'foo.loc', '/', '', ''))
+
+    result = get_connection_settings('/', hdr(host='https://foo.loc:8443'))
+    assert result == (('foo.loc', 8443), ('https', 'foo.loc:8443', '/', '', ''))
+
+    result = get_connection_settings('/', hdr(host='https://foo.loc:8443',
+                                              **{'vial-connect': 'boo.loc'}))
+    assert result == (('boo.loc', None), ('http', 'foo.loc:8443', '/', '', ''))
+
+    result = get_connection_settings('/', hdr(host='https://foo.loc',
+                                              **{'vial-connect': 'https://boo.loc:8443'}))
+    assert result == (('boo.loc', 8443), ('https', 'foo.loc', '/', '', ''))

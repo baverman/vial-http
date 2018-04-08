@@ -331,3 +331,20 @@ Timeouts
 
 * ``Vial-Timeout``: sets read timeout (default is 5s).
 * ``Vial-Connect-Timeout``: sets connection timeout (default is 30s).
+
+Force ``Host`` header
+~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes you need to test production locally, connect to localhost
+service and provide production ``Host``. You can use ``Vial-Connect`` special
+header::
+
+    Host: desktop.production.com
+    Vial-Connect: 127.0.0.1:8000
+    User-Agent: Mobile User Agent
+
+    GET /  # Response should contain redirect to mobile.production.com
+
+Also you can use explicit schema::
+
+    Vial-Connect: https://127.0.0.1:8443

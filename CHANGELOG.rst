@@ -9,6 +9,9 @@
 * [Feature] timeout control via special headers ``Vial-Timeout`` and
   ``Vial-Connect-Timeout``.
 
+* [Feature] force ``Host`` header with explicit connection via ``Vial-Connect``
+  special header.
+
 * [Fix] override headers in query string.
 
 * [Fix] unicode error in xml decoder.
