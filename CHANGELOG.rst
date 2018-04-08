@@ -1,3 +1,19 @@
+0.4dev
+======
+
+* [Break] renamed python package ``http`` -> ``vial_http`` to
+  avoid conflict with python3 stdlib.
+
+* [Feature] python3 support.
+
+* [Feature] timeout control via special headers ``Vial-Timeout`` and
+  ``Vial-Connect-Timeout``.
+
+* [Fix] override headers in query string.
+
+* [Fix] unicode error in xml decoder.
+
+
 0.3
 ===
 

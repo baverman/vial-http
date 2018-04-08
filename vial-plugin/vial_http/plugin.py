@@ -90,6 +90,9 @@ def http():
         echoerr(str(e))
         return
 
+    connect_timeout = float(headers.pop('Vial-Connect-Timeout', CONNECT_TIMEOUT))
+    read_timeout = float(headers.pop('Vial-Timeout', READ_TIMEOUT))
+
     u = urlparse.urlsplit(url)
     if not u.hostname:
         host = headers.pop('host', '')
@@ -107,11 +110,11 @@ def http():
     if u.scheme == 'https':
         import ssl
         cn = httplib.HTTPSConnection(u.hostname, u.port or 443,
-                                     timeout=CONNECT_TIMEOUT,
+                                     timeout=connect_timeout,
                                      context=ssl._create_unverified_context())
     else:
         cn = httplib.HTTPConnection(u.hostname, u.port or 80,
-                                    timeout=CONNECT_TIMEOUT)
+                                    timeout=connect_timeout)
 
     cn = send_collector(cn)
 
@@ -119,7 +122,7 @@ def http():
     cn.connect()
     ctime = int((time.time() - start) * 1000)
 
-    cn.sock.settimeout(READ_TIMEOUT)
+    cn.sock.settimeout(read_timeout)
 
     cn.request(method, path, body, headers)
     response = cn.getresponse()

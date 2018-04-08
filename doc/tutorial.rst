@@ -321,3 +321,13 @@ And you get generated lines ready to executed::
     GET /order/status id=dcf43d11-14b4-4737-a575-b72b945d6254
 
     DELETE /order id=dcf43d11-14b4-4737-a575-b72b945d6254
+
+
+Special headers
+---------------
+
+Timeouts
+~~~~~~~~
+
+* ``Vial-Timeout``: sets read timeout (default is 5s).
+* ``Vial-Connect-Timeout``: sets connection timeout (default is 30s).
