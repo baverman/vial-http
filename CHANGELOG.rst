@@ -12,6 +12,9 @@
 * [Feature] force ``Host`` header with explicit connection via ``Vial-Connect``
   special header.
 
+* [Feature] client can pass client certificate via ``Vial-Client-Cert`` and
+  ``Vial-Client-Key`` special headers.
+
 * [Fix] override headers in query string.
 
 * [Fix] unicode error in xml decoder.

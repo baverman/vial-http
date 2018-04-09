@@ -336,7 +336,8 @@ Force ``Host`` header
 ~~~~~~~~~~~~~~~~~~~~~
 
 Sometimes you need to test production locally, connect to localhost
-service and provide production ``Host``. You can use ``Vial-Connect`` special
+service and provide production ``Host``. Or test frontend server
+behind balancer with different port. You can use ``Vial-Connect`` special
 header::
 
     Host: desktop.production.com
@@ -348,3 +349,18 @@ header::
 Also you can use explicit schema::
 
     Vial-Connect: https://127.0.0.1:8443
+
+Client Certificates
+~~~~~~~~~~~~~~~~~~~
+
+* ``Vial-Client-Cert``: path to file with client certificate in PEM format.
+  Certificate may include private key.
+
+* ``Vial-Client-Key``: path to file with client private key in PEM format.
+  This header is optional if certificate includes key already.
+
+IMPORTANT. Key must be without password protection.
+
+You can get combined certificate by concatenating two PEM files::
+
+    cat client.key client.crt > client.pem

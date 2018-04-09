@@ -15,6 +15,7 @@ Awesome http REST tool for vim
 * Separate buffers for response body, response headers and request
 * DRY
 * Support for HTTP basic auth
+* Support for ssl client certificates
 
 
 ## Install

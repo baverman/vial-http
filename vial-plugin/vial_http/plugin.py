@@ -99,14 +99,16 @@ def http():
     if query:
         path += ('&' if u.query else '?') + urllib.urlencode(query)
 
+    certfile = headers.pop('Vial-Client-Cert')
+    keyfile = headers.pop('Vial-Client-Key')
+
     if u.scheme == 'https':
         import ssl
+        ctx = ssl._create_unverified_context(certfile=certfile, keyfile=keyfile)
         cn = httplib.HTTPSConnection(host, port or 443,
-                                     timeout=connect_timeout,
-                                     context=ssl._create_unverified_context())
+                                     timeout=connect_timeout, context=ctx)
     else:
-        cn = httplib.HTTPConnection(host, port or 80,
-                                    timeout=connect_timeout)
+        cn = httplib.HTTPConnection(host, port or 80, timeout=connect_timeout)
 
     cn = send_collector(cn)
 
