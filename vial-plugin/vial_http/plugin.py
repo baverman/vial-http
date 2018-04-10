@@ -9,18 +9,18 @@ from vial.compat import PY2, iteritems, bstr
 
 if PY2:
     import urllib
+    import urlparse
     import httplib
-    import Cookie
     from cStringIO import StringIO
 else:
-    from http import cookies as Cookie
     from http import client as httplib
     from urllib import parse as urllib
+    from urllib import parse as urlparse
     from io import BytesIO as StringIO
 
 from .util import (get_headers_and_templates, send_collector, prepare_request,
                    PrepareException, render_template, Headers, pretty_xml,
-                   get_connection_settings)
+                   get_connection_settings, CookieJar)
 
 CONNECT_TIMEOUT = 5
 READ_TIMEOUT = 30
@@ -72,6 +72,91 @@ def format_content(content_type, content):
     return content, 'text', {}
 
 
+class RequestContext(object):
+    def _request(self, method, url, query, body, headers):
+        (host, port), u = get_connection_settings(url, headers)
+        headers.set('Host', u.netloc)
+
+        path = u.path
+        if u.query:
+            path += '?' + u.query
+
+        if query:
+            path += ('&' if u.query else '?') + urllib.urlencode(query)
+
+        if u.scheme == 'https':
+            import ssl
+            ctx = ssl._create_unverified_context(certfile=self.certfile,
+                                                 keyfile=self.keyfile)
+            cn = httplib.HTTPSConnection(host, port or 443,
+                                         timeout=self.connect_timeout, context=ctx)
+        else:
+            cn = httplib.HTTPConnection(host, port or 80,
+                                        timeout=self.connect_timeout)
+
+
+        cn = send_collector(cn)
+
+        start = time.time()
+        cn.connect()
+        self.ctime = int((time.time() - start) * 1000)
+
+        cn.sock.settimeout(self.read_timeout)
+
+        cn.request(method, path, body, headers)
+        self.response = cn.getresponse()
+        self.rtime = int((time.time() - start) * 1000)
+
+        self.content = self.response.read()
+        self.ftime = int((time.time() - start) * 1000)
+        self.response.close()
+        cn.close()
+
+        self.response.request = ((host, port),
+                                 '{}://{}{}'.format(u.scheme, u.netloc, path or '/'))
+
+        self.cj = CookieJar()
+        self.cj.load(self.response)
+
+        self.raw_request = cn._sdata
+        return self.response
+
+    def request(self, method, url, query, body, headers):
+        self.connect_timeout = float(headers.pop('Vial-Connect-Timeout', CONNECT_TIMEOUT))
+        self.read_timeout = float(headers.pop('Vial-Timeout', READ_TIMEOUT))
+        self.certfile = headers.pop('Vial-Client-Cert')
+        self.keyfile = headers.pop('Vial-Client-Key')
+        self.history = []
+
+        do_redirects = headers.pop('Vial-Redirect', '').lower() in ('1', 't', 'true', 'yes')
+        original_headers = headers
+
+        for _ in range(5):
+            resp = self._request(method, url, query, body, headers)
+            self.history.append(resp)
+
+            if not do_redirects or resp.status not in (301, 302, 303):
+                break
+
+            url = resp.getheader('location')
+            if not url:
+                break
+
+            u = urlparse.urlsplit(url)
+            if u.netloc == headers.get('Host'):
+                headers = original_headers
+            else:
+                headers = original_headers.copy('User-Agent')
+
+    @property
+    def rcookies(self):
+        return {k: v.value for k, v in iteritems(self.cj.cookies)}
+
+    @property
+    def cookies(self):
+        return {k: v.coded_value for k, v in iteritems(self.cj.cookies)}
+
+
 def http():
     lines = vim.current.buffer[:]
     line, _ = vim.current.window.cursor
@@ -86,97 +171,64 @@ def http():
         echoerr(str(e))
         return
 
-    connect_timeout = float(headers.pop('Vial-Connect-Timeout', CONNECT_TIMEOUT))
-    read_timeout = float(headers.pop('Vial-Timeout', READ_TIMEOUT))
-
-    (host, port), u = get_connection_settings(url, headers)
-    headers.set('Host', u.netloc)
-
-    path = u.path
-    if u.query:
-        path += '?' + u.query
-
-    if query:
-        path += ('&' if u.query else '?') + urllib.urlencode(query)
-
-    certfile = headers.pop('Vial-Client-Cert')
-    keyfile = headers.pop('Vial-Client-Key')
-
-    if u.scheme == 'https':
-        import ssl
-        ctx = ssl._create_unverified_context(certfile=certfile, keyfile=keyfile)
-        cn = httplib.HTTPSConnection(host, port or 443,
-                                     timeout=connect_timeout, context=ctx)
-    else:
-        cn = httplib.HTTPConnection(host, port or 80, timeout=connect_timeout)
-
-    cn = send_collector(cn)
-
-    start = time.time()
-    cn.connect()
-    ctime = int((time.time() - start) * 1000)
-
-    cn.sock.settimeout(read_timeout)
-
-    cn.request(method, path, body, headers)
-    response = cn.getresponse()
-    rtime = int((time.time() - start) * 1000)
+    rctx = RequestContext()
+    rctx.request(method, url, query, body, headers)
 
     cwin = vim.current.window
 
     win, buf = make_scratch('__vial_http_req__', title='Request')
-    buf[:] = cn._sdata.splitlines()
+    rlines = rctx.raw_request.splitlines()
+
+    hlines = []
+    for r in rctx.history[:-1]:
+        hlines.append(bstr('Redirect {} from {}'.format(
+            r.status, r.request[1]), 'utf-8'))
+    if hlines:
+        hlines.append(b'----------------')
+
+    buf[:] = hlines + rlines
     win.cursor = 1, 0
 
     win, buf = make_scratch('__vial_http_hdr__', title='Response headers')
     if PY2:
-        buf[:] = [r.rstrip('\r\n') for r in response.msg.headers]
+        buf[:] = [r.rstrip('\r\n') for r in rctx.response.msg.headers]
     else:
-        buf[:] = ['{}: {}'.format(*r).encode('utf-8') for r in response.msg._headers]
+        buf[:] = ['{}: {}'.format(*r).encode('utf-8') for r in rctx.response.msg._headers]
 
     win.cursor = 1, 0
 
-    content = response.read()
-    size = len(content)
+    size = len(rctx.content)
 
     win, buf = make_scratch('__vial_http_raw__', title='Raw Response')
-    buf[:] = content.splitlines()
+    buf[:] = rctx.content.splitlines()
     win.cursor = 1, 0
 
     if PY2:
-        rcontent_type = response.msg.gettype()
+        rcontent_type = rctx.response.msg.gettype()
     else:
-        rcontent_type = response.msg.get_content_type()
+        rcontent_type = rctx.response.msg.get_content_type()
 
-    content, ctype, jdata = format_content(rcontent_type, content)
+    content, ctype, jdata = format_content(rcontent_type, rctx.content)
 
     win, buf = make_scratch('__vial_http__')
     win.options['statusline'] = 'Response: {} {} {}ms {}ms {}'.format(
-        response.status, response.reason, ctime, rtime, sizeof_fmt(size))
+        rctx.response.status, rctx.response.reason,
+        rctx.ctime, rctx.rtime, sizeof_fmt(size))
     vim.command('set filetype={}'.format(ctype))
     buf[:] = content.splitlines(False)
     win.cursor = 1, 0
 
     focus_window(cwin)
 
-    cj = Cookie.SimpleCookie()
-    if PY2:
-        cheaders = response.msg.getheaders('set-cookie')
-    else:
-        cheaders = response.msg.get_all('set-cookie')
-    for h in cheaders or []:
-        cj.load(h)
-    rcookies = {k: v.value for k, v in iteritems(cj)}
-    cookies = {k: v.coded_value for k, v in iteritems(cj)}
-
     def set_cookies(*args):
+        cookies = rctx.cookie
         args = args or sorted(cookies.keys())
         return 'Cookie: ' + ';'.join('{}={}'.format(k, cookies[k]) for k in args)
 
     ctx = {'body': content, 'json': jdata,
-           'headers': Headers(response.getheaders()),
-           'cookies': cookies,
-           'rcookies': rcookies,
+           'headers': Headers(rctx.response.getheaders()),
+           'cookies': rctx.cookies,
+           'rcookies': rctx.rcookies,
            'set_cookies': set_cookies}
 
     for t in tlist:

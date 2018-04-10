@@ -10,10 +10,12 @@ from vial.compat import PY2, bstr, filter, sstr, ustr
 if PY2:
     import urllib
     import urlparse
+    import Cookie
     from cStringIO import StringIO
 else:
     from urllib import parse as urllib
     from urllib import parse as urlparse
+    from http import cookies as Cookie
     from io import BytesIO as StringIO
 
 from .multipart import encode_multipart
@@ -235,6 +237,14 @@ class Headers(object):
     def __iter__(self):
         return (h for h, _ in self.headers)
 
+    def copy(self, *names):
+        result = Headers()
+        for name in names:
+            v = self.get(name)
+            if v is not None:
+                result.set(name, v)
+        return result
+
 
 def get_headers_and_templates(lines, line):
     headers = Headers()
@@ -399,3 +409,16 @@ def get_connection_settings(url, headers):
         return (vu.hostname, vu.port), u._replace(scheme=vu.scheme)
 
     return (u.hostname, u.port), u
+
+
+class CookieJar(object):
+    def __init__(self):
+        self.cookies = Cookie.SimpleCookie()
+
+    def load(self, response):
+        if PY2:
+            cheaders = response.msg.getheaders('set-cookie')
+        else:
+            cheaders = response.msg.get_all('set-cookie')
+        for h in cheaders or []:
+            self.cookies.load(h)

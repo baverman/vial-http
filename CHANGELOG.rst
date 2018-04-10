@@ -15,6 +15,8 @@
 * [Feature] client can pass client certificate via ``Vial-Client-Cert`` and
   ``Vial-Client-Key`` special headers.
 
+* [Feature] auto redirects via ``Vial-Redirect`` special header.
+
 * [Fix] override headers in query string.
 
 * [Fix] unicode error in xml decoder.

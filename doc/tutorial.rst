@@ -364,3 +364,12 @@ IMPORTANT. Key must be without password protection.
 You can get combined certificate by concatenating two PEM files::
 
     cat client.key client.crt > client.pem
+
+
+Redirects
+~~~~~~~~~
+
+Vial-Http doesn't handle redirects by default. You can control behavior via
+``Vial-Redirect`` special header::
+
+    Vial-Redirect: 1
