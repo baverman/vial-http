@@ -221,7 +221,7 @@ def http():
     focus_window(cwin)
 
     def set_cookies(*args):
-        cookies = rctx.cookie
+        cookies = rctx.cookies
         args = args or sorted(cookies.keys())
         return 'Cookie: ' + ';'.join('{}={}'.format(k, cookies[k]) for k in args)
 
