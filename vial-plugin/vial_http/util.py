@@ -21,7 +21,7 @@ else:
 from .multipart import encode_multipart
 
 header_regex = re.compile(r'^\+?[-\w\d]+$')
-value_regex = re.compile(r'^([-_\w\d]+)(:=|@=|=|:)(.+)$')
+value_regex = re.compile(r'^([^\s:=@]+)(:=|@=|=|:)(.+)$')
 
 
 class PrepareException(Exception): pass
