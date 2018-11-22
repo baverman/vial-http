@@ -62,14 +62,25 @@ def find_request(lines, line):
             break
 
     line = l
+    rlines = []
 
     bodylines = []
-    for l in lines[line+1:]:
-        if not l.strip():
-            break
-        bodylines.append(l)
 
-    return lines[line], '\n'.join(bodylines) or None, line + len(bodylines)
+    rlines.append(lines[l])
+
+    length = len(lines)
+
+    while l < length - 1:
+        l += 1
+        cline = lines[l]
+        if lines[l-1].endswith('\\'):
+            rlines.append(cline)
+            continue
+        if not cline.strip():
+            break
+        bodylines.append(cline)
+
+    return '  '.join(rlines), '\n'.join(bodylines) or None, line + len(rlines) + len(bodylines) - 1
 
 
 def parse_request_line(line, input_func=None, pwd_func=None):
@@ -92,6 +103,7 @@ def parse_request_line(line, input_func=None, pwd_func=None):
         tail = ''
 
     if tail:
+        print(tail)
         parts = shlex.split(tail, True)
         try:
             pos = parts.index('|')
