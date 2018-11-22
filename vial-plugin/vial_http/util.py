@@ -103,7 +103,6 @@ def parse_request_line(line, input_func=None, pwd_func=None):
         tail = ''
 
     if tail:
-        print(tail)
         parts = shlex.split(tail, True)
         try:
             pos = parts.index('|')
