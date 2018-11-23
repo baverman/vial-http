@@ -77,10 +77,11 @@ def find_request(lines, line):
             rlines.append(cline)
             continue
         if not cline.strip():
+            l -= 1
             break
         bodylines.append(cline)
 
-    return '  '.join(rlines), '\n'.join(bodylines) or None, line + len(rlines) + len(bodylines) - 1
+    return '  '.join(rlines), '\n'.join(bodylines) or None, l
 
 
 def parse_request_line(line, input_func=None, pwd_func=None):
