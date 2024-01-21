@@ -66,6 +66,10 @@ Simple, huh? Header value will be in effect for all requests on any line after.
 In a response window status line you can see a response code and
 connect/read times. For example ``Response: 200 OK 42ms 10ms``.
 
+**NOTE:** if you use a status line plugin like lightline or airline, you will
+not see the response text in the status line. However, you can use
+``VialHttpResponse()`` to get the response or configure your plugin to show it.
+
 You can pass query params as usual::
 
     GET /query?q=some%3Astring+with+spaces&page=1

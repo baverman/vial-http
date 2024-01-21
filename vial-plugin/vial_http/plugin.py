@@ -26,6 +26,18 @@ CONNECT_TIMEOUT = 5
 READ_TIMEOUT = 30
 XML_FORMAT_SIZE_THRESHOLD = 2 ** 20
 
+http_response = ''
+
+
+def set_http_response(response):
+    global http_response
+    http_response = response
+    return http_response;
+
+
+def get_http_response():
+    return http_response
+
 
 def sizeof_fmt(num, suffix='b'):
     for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
@@ -211,9 +223,10 @@ def http():
     content, ctype, jdata = format_content(rcontent_type, rctx.content)
 
     win, buf = make_scratch('__vial_http__')
-    win.options['statusline'] = 'Response: {} {} {}ms {}ms {}'.format(
+    response_text = 'Response: {} {} {}ms {}ms {}'.format(
         rctx.response.status, rctx.response.reason,
         rctx.ctime, rctx.rtime, sizeof_fmt(size))
+    win.options['statusline'] = set_http_response(response_text)
     vim.command('set filetype={}'.format(ctype))
     buf[:] = content.splitlines(False)
     win.cursor = 1, 0

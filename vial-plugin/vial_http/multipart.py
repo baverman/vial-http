@@ -70,8 +70,8 @@ def encode_multipart(fields, files, boundary=None):
     body = b'\r\n'.join(lines)
 
     headers = {
-        b'Content-Type': b'multipart/form-data; boundary=%s' % boundary,
-        b'Content-Length': bstr(str(len(body))),
+        'Content-Type': b'multipart/form-data; boundary=%s' % boundary,
+        'Content-Length': bstr(str(len(body))),
     }
 
     return (body, headers)
