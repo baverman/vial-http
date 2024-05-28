@@ -1,6 +1,11 @@
 import json
 import time
 
+try:
+    from shlex import quote as cmd_quote
+except ImportError:
+    from pipes import quote as cmd_quote
+
 from vial import vfunc, vim
 from vial.utils import focus_window
 from vial.helpers import echoerr
@@ -157,7 +162,7 @@ class RequestContext(object):
         return {k: v.coded_value for k, v in iteritems(self.cj.cookies)}
 
 
-def http():
+def parse_request_at_cursor():
     lines = vim.current.buffer[:]
     line, _ = vim.current.window.cursor
     line -= 1
@@ -165,8 +170,12 @@ def http():
     headers, templates = get_headers_and_templates(lines, line)
     pwd_func = lambda p: vfunc.inputsecret('{}: '.format(p))
     input_func = lambda p: vfunc.input('{}: '.format(p))
+    return (headers, templates) + prepare_request(lines, line, headers, input_func, pwd_func)
+
+
+def http():
     try:
-        method, url, query, body, tlist, rend = prepare_request(lines, line, headers, input_func, pwd_func)
+        headers, templates, method, url, query, body, tlist, rend = parse_request_at_cursor()
     except PrepareException as e:
         echoerr(str(e))
         return
@@ -238,6 +247,70 @@ def http():
             lines = ['ERROR: template {} not found'.format(t)]
         vfunc.append(rend + 1, [''] + lines)
         rend += 1 + len(lines)
+
+
+def curl():
+    try:
+        headers, _, method, url, query, body, tlist, _ = parse_request_at_cursor()
+    except PrepareException as e:
+        echoerr(str(e))
+        return
+
+    vial_host = headers.pop('Vial-Curl-Host', None)
+    opts = headers.pop('Vial-Curl-Opts', None)
+
+    if vial_host:
+        headers.set('Host', vial_host)
+
+    (host, port), u = get_connection_settings(url, headers)
+    # headers.set('Host', u.netloc)
+    path = u.path
+    if u.query:
+        path += '?' + u.query
+
+    if query:
+        path += ('&' if u.query else '?') + urllib.urlencode(query)
+
+    cmd = ['curl']
+    if method != 'GET':
+        cmd.extend(['-X', method])
+
+    if opts:
+        cmd.append(opts)
+
+    ignored_headers = {it.strip().lower() for it in headers.pop('vial-curl-ignored-headers', '').split(',')}
+    if headers.get('User-Agent') == 'vial-http':
+        ignored_headers.add('user-agent')
+
+    form = None
+    if body and headers.get('Content-Type') == 'application/x-www-form-urlencoded':
+        headers.pop('Content-Type')
+        form = urlparse.parse_qsl(body)
+        body = None
+
+    for k, v in headers.items():
+        if k.lower() not in ignored_headers:
+            cmd.extend(['-H', cmd_quote(k + ': ' + v)])
+
+    if form:
+        for k, v in form:
+            cmd.extend(['-d', '{}={}'.format(k, urllib.quote_plus(v))])
+
+    if body:
+        cmd.extend(['--data-binary', '@-'])
+
+    cmd.append(cmd_quote(u._replace(path=path).geturl()))
+
+    if body:
+        cmd.extend(['<< EOF\n' + body + '\nEOF'])
+
+    content = ' '.join(cmd)
+
+    cwin = vim.current.window
+    win, buf = make_scratch('__vial_http_curl_')
+    buf[:] = content.splitlines(False)
+    win.cursor = 1, 0
+    focus_window(cwin)
 
 
 def basic_auth(user, password):
